@@ -15,6 +15,9 @@ def create_app(config_class=Config):
 
     # 2. Modelos para Alembic / migrations
     from .models import medicamento
+    from .models import usuario
+    from .models import tratamiento
+    from .models import registro_toma
 
     # 3. Rutas básicas
     @app.route("/api/estado-db", methods=['GET'])
