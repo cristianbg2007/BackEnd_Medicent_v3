@@ -29,8 +29,10 @@ def create_app(config_class=Config):
     # 3. Registrar Blueprints
     from app.routes.medicamento_routes import medicamento_bp
     from app.routes.tratamiento_routes import tratamiento_bp
+    from app.routes.toma_routes import toma_bp
     app.register_blueprint(medicamento_bp)
     app.register_blueprint(tratamiento_bp)
+    app.register_blueprint(toma_bp)
 
     @app.route("/api/estado-db", methods=['GET'])
     def revisar_db():

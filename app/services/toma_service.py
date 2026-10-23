@@ -93,3 +93,17 @@ def marcar_toma(toma_id, nuevo_estado, fecha_toma=None):
 
     return toma
 
+
+def obtener_tomas_por_paciente(paciente_id):
+    """
+    Retorna la lista de todas las tomas de los tratamientos de un paciente,
+    ordenadas por fecha y hora programada.
+    """
+    return (
+        RegistroToma.query
+        .join(Tratamiento)
+        .filter(Tratamiento.paciente_id == paciente_id)
+        .order_by(RegistroToma.fecha_hora_programada.asc())
+        .all()
+    )
+
