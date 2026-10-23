@@ -26,6 +26,10 @@ def create_app(config_class=Config):
     from .models import registro_toma
     from .models import paciente_cuidador
 
+    # 3. Registrar Blueprints
+    from app.routes.medicamento_routes import medicamento_bp
+    app.register_blueprint(medicamento_bp)
+
     @app.route("/api/estado-db", methods=['GET'])
     def revisar_db():
         db.session.execute(text("select 1"))
