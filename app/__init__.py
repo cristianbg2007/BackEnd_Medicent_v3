@@ -1,6 +1,6 @@
 from flask import Flask
 from app.config.settings import Config
-from app.database.connection import db, migrate, bycrypt, jwt
+from app.database.connection import db, migrate, bcrypt, jwt
 from sqlalchemy import text
 from flask_cors import CORS
 
@@ -12,9 +12,8 @@ def create_app(config_class=Config):
     # 1. Inicializar la base de datos y extensiones
     db.init_app(app)
     #copia los ajustes guardados en la caja de Config
-    app.config.from_object(Config)
     migrate.init_app(app, db)
-    bycrypt.init_app(app)
+    bcrypt.init_app(app)
     jwt.init_app(app)
     CORS(app)
 
