@@ -3,6 +3,7 @@ from app.config.settings import Config
 from app.database.connection import db, migrate, bcrypt, jwt
 from sqlalchemy import text
 from flask_cors import CORS
+from app.routes.auth_routes import auth_bp 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -16,7 +17,6 @@ def create_app(config_class=Config):
     bcrypt.init_app(app)
     jwt.init_app(app)
     CORS(app)
-
 
     # 2. Modelos para Alembic / migrations
     from .models import medicamento
@@ -32,6 +32,7 @@ def create_app(config_class=Config):
     app.register_blueprint(medicamento_bp)
     app.register_blueprint(tratamiento_bp)
     app.register_blueprint(toma_bp)
+    app.register_blueprint(auth_bp)
 
     @app.route("/api/estado-db", methods=['GET'])
     def revisar_db():
