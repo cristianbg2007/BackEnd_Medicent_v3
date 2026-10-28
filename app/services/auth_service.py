@@ -16,7 +16,6 @@ def registrar_usuario(nombre, correo, contrasena, rol):
         contrasena_hash = contrasena_hash,
         rol = rol
     )
-
     db.session.add(nuevo_usuario)
     db.session.commit()
     return nuevo_usuario
