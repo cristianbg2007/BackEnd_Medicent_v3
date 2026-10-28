@@ -1,4 +1,4 @@
-from tests.base_test import BaseTestCase
+from base_test import BaseTestCase
 from app.models.medicamento import Medicamento
 from app.database.connection import db
 

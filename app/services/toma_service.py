@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.database.connection import db
 from app.models.tratamiento import Tratamiento
 from app.models.registro_toma import RegistroToma
@@ -86,7 +86,7 @@ def marcar_toma(toma_id, nuevo_estado, fecha_toma=None):
 
     # 2. Registrar la fecha y hora de la toma
     if nuevo_estado in ('tomada', 'retrasada'):
-        toma.fecha_hora_toma = fecha_toma if fecha_toma else datetime.utcnow()
+        toma.fecha_hora_toma = fecha_toma if fecha_toma else datetime.now(timezone.utc)
 
     # 3. Guardar cambios en la base de datos
     db.session.commit()

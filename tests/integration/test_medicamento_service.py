@@ -1,4 +1,4 @@
-from tests.base_test import BaseTestCase
+from base_test import BaseTestCase
 from app.services.medicamento_service import (
     crear_medicamento,
     obtener_medicamentos,

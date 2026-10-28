@@ -1,5 +1,5 @@
 from datetime import date, time, datetime
-from tests.base_test import BaseTestCase
+from base_test import BaseTestCase
 from app.services.toma_service import calcular_horarios_tomas
 
 class TestCalculoTomas(BaseTestCase):

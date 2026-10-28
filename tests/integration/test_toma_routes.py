@@ -1,5 +1,5 @@
 from datetime import date, time
-from tests.base_test import BaseTestCase
+from base_test import BaseTestCase
 from app.models.usuario import Usuario
 from app.models.medicamento import Medicamento
 from app.services.tratamiento_service import crear_tratamiento
