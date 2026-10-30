@@ -16,7 +16,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    CORS(app)
+    CORS(app, origins=["http://localhost:5173"])
 
     # 2. Modelos para Alembic / migrations
     from .models import medicamento

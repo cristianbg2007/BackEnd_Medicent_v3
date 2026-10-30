@@ -48,3 +48,15 @@ class TestAuthService(BaseTestCase):
         self.assertIn("token", resultado)
         self.assertEqual(resultado.get("nombre"), nombre)
         self.assertEqual(resultado.get("rol"), rol)
+
+    def test_login_contrasena_incorrecta(self):
+    #Arrage
+        nombre="Julian"
+        correo="JulianNossa@gmail.com"
+        contrasena="159753"
+        rol="paciente"
+    #Act
+        registrar_usuario(nombre, correo, contrasena ,rol)
+        resultado =iniciar_sesion(correo, "contrasena_incorrecta")
+    #Assert
+        self.assertIsNone(resultado)
