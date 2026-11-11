@@ -30,7 +30,7 @@ def iniciar_sesion(correo,contrasena):
     if verificar_contrasena is False:
         return None
 
-    token = create_access_token(identity=usuario_existe.id, additional_claims={"rol":usuario_existe.rol})
+    token = create_access_token(identity=str(usuario_existe.id), additional_claims={"rol": usuario_existe.rol})
     return {
         "token":token, 
         "id":usuario_existe.id,
