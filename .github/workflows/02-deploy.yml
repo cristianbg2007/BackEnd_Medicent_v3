@@ -1,0 +1,290 @@
+# Pipeline 2: CI/CD a AWS EC2  (VERSIÓN 2: un job por etapa) -- RECOMENDADA
+# Guárdalo en tu repositorio como .github/workflows/02-deploy.yml
+#   Linter -> Unit Tests -> Integration Tests (MySQL real) -> Deploy
+#
+# Supone una app Flask con:
+#   wsgi.py (expone `app`), requirements.txt,
+#   tests/unit/, tests/integration/ y un endpoint GET /health
+#
+# Secrets: EC2_HOST, EC2_USER, EC2_SSH_KEY (en los environments staging/production)
+
+name: 02 - CI/CD Deploy EC2
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  APP_DIR: /opt/flaskapp
+
+jobs:
+  # ---------------------------------------------------------------
+  # Job 1: revisar el estilo del código.
+  # Cada job corre en una máquina nueva: por eso todos empiezan
+  # clonando el repositorio e instalando lo que necesitan.
+  # ---------------------------------------------------------------
+  lint:
+    name: Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar herramientas de estilo
+        run: pip install flake8 black isort
+
+      - name: Revisar formato con black
+        run: black --check .
+
+      - name: Revisar orden de imports con isort
+        run: isort --check-only --profile black .
+
+      - name: Revisar errores de estilo con flake8
+        run: flake8 . --max-line-length=100 --exclude=venv
+
+  # ---------------------------------------------------------------
+  # Job 2: pruebas unitarias con SQLite en memoria.
+  # ---------------------------------------------------------------
+  unit-tests:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Ejecutar pruebas unitarias
+        env:
+          DATABASE_URL: "sqlite:///:memory:"
+          SECRET_KEY: test
+        run: pytest tests/unit --cov=. --cov-report=xml --junitxml=unit-results.xml
+
+      - name: Guardar reportes de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            unit-results.xml
+            coverage.xml
+
+  # ---------------------------------------------------------------
+  # Job 3: pruebas de integración contra un MySQL real y temporal.
+  # ---------------------------------------------------------------
+  integration-tests:
+    name: Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app_test
+          MYSQL_USER: app
+          MYSQL_PASSWORD: app
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      DATABASE_URL: mysql+pymysql://app:app@127.0.0.1:3306/app_test
+      SECRET_KEY: test
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Ejecutar pruebas de integración
+        run: pytest tests/integration --junitxml=integration-results.xml
+
+      - name: Guardar reportes de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: integration-results.xml
+
+  # ---------------------------------------------------------------
+  # Job E2E (DESACTIVADO): pruebas de punta a punta.
+  # Levanta la app con Gunicorn en la máquina de GitHub, con un MySQL
+  # temporal, y ejecuta tests/e2e contra http://127.0.0.1:8000
+  # (la URL llega a las pruebas en la variable BASE_URL).
+  #
+  # Para activarlo cuando tengas pruebas en tests/e2e:
+  #   1. Quita el "# " del inicio de cada línea de este job.
+  #   2. En el job deploy, cambia "needs: integration-tests"
+  #      por "needs: e2e-tests" (está indicado allí).
+  #   3. Si tus pruebas usan otras librerías (por ejemplo playwright),
+  #      agrégalas en el paso "Instalar dependencias".
+  # ---------------------------------------------------------------
+  # e2e-tests:
+    # name: E2E Tests
+    # needs: integration-tests
+    # runs-on: ubuntu-latest
+    # services:
+      # mysql:
+        # image: mysql:8.0
+        # env:
+          # MYSQL_ROOT_PASSWORD: root
+          # MYSQL_DATABASE: app_test
+          # MYSQL_USER: app
+          # MYSQL_PASSWORD: app
+        # ports: ["3306:3306"]
+        # options: >-
+          # --health-cmd="mysqladmin ping -h localhost"
+          # --health-interval=10s --health-timeout=5s --health-retries=5
+    # env:
+      # DATABASE_URL: mysql+pymysql://app:app@127.0.0.1:3306/app_test
+      # SECRET_KEY: test
+      # BASE_URL: http://127.0.0.1:8000
+    # steps:
+      # - name: Clonar el repositorio
+        # uses: actions/checkout@v4
+#
+      # - name: Instalar Python
+        # uses: actions/setup-python@v5
+        # with:
+          # python-version: ${{ env.PYTHON_VERSION }}
+          # cache: pip
+#
+      # - name: Instalar dependencias
+        # run: pip install -r requirements.txt pytest pytest-cov requests gunicorn
+#
+      # - name: Levantar la app con Gunicorn
+        # run: |
+          # gunicorn wsgi:app --bind 127.0.0.1:8000 --daemon
+          # for i in 1 2 3 4 5 6; do
+            # sleep 5
+            # curl -fsS "$BASE_URL/health" && exit 0
+          # done
+          # echo "La app no respondió en /health"
+          # exit 1
+#
+      # - name: Ejecutar pruebas E2E
+        # run: pytest tests/e2e --junitxml=e2e-results.xml
+#
+      # - name: Guardar reportes de pruebas
+        # if: always()
+        # uses: actions/upload-artifact@v4
+        # with:
+          # name: e2e-test-results
+          # path: e2e-results.xml
+
+  # ---------------------------------------------------------------
+  # Job 4: desplegar en el servidor (staging o production).
+  # No corre en pull requests.
+  # ---------------------------------------------------------------
+  deploy:
+    name: Deploy
+    needs: integration-tests
+    # needs: e2e-tests        # <- usa esta línea en lugar de la anterior al activar E2E
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar carpeta de releases
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_DIR: ${{ env.APP_DIR }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: APP_DIR
+          script: |
+            set -euo pipefail
+            mkdir -p "$APP_DIR/releases"
+
+      - name: Subir código a la carpeta de release
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -az --delete --exclude=.git --exclude=.github --exclude=tests --exclude=venv
+          path: ./
+          remote_path: ${{ env.APP_DIR }}/releases/${{ github.sha }}/
+          remote_host: ${{ secrets.EC2_HOST }}
+          remote_user: ${{ secrets.EC2_USER }}
+          remote_key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Instalar dependencias, activar release y verificar
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_DIR: ${{ env.APP_DIR }}
+          SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: APP_DIR,SHA
+          script: |
+            set -euo pipefail
+            REL="$APP_DIR/releases/$SHA"
+
+            # 1. Dependencias en el entorno virtual del servidor (como el usuario dueño del venv)
+            sudo -u flaskapp "$APP_DIR/venv/bin/pip" install -q -r "$REL/requirements.txt"
+
+            # 2. Recordar la release activa, para poder volver a ella
+            PREV=""
+            if [ -L "$APP_DIR/app" ]; then
+              PREV=$(readlink -f "$APP_DIR/app")
+            else
+              sudo rm -rf "$APP_DIR/app"   # primera vez: era una carpeta vacía
+            fi
+
+            # 3. Activar la release nueva y reiniciar Gunicorn
+            ln -sfn "$REL" "$APP_DIR/app"
+            sudo systemctl restart flaskapp
+
+            # 4. Health check: hasta 6 intentos, 5 segundos entre cada uno
+            for i in 1 2 3 4 5 6; do
+              sleep 5
+              if curl -fsS http://localhost/health; then
+                echo
+                echo "Release $SHA activa"
+                # Conservar solo las 5 últimas releases
+                ls -1dt "$APP_DIR"/releases/* | tail -n +6 | xargs -r rm -rf
+                exit 0
+              fi
+            done
+
+            # 5. Rollback: volver a la release anterior
+            echo "Health check falló -> rollback a ${PREV:-ninguna}"
+            if [ -n "$PREV" ] && [ "$PREV" != "$REL" ]; then
+              ln -sfn "$PREV" "$APP_DIR/app"
+              sudo systemctl restart flaskapp
+            fi
+            exit 1
